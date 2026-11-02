@@ -1,0 +1,31 @@
+# --- secrets and local settings: NEVER commit these ---
+.env
+.env.*
+!.env.example
+
+# --- local databases and data ---
+*.db
+*.sqlite3
+*.mmdb            # MaxMind's GeoLite2 licence does not allow redistributing the database
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# --- tools, editors, OS ---
+.locust/
+.idea/
+.vscode/
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# --- generated files ---
+*.zip
+benchmark_results/*.csv
+benchmark_results/*.html

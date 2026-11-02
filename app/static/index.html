@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shortly - URL shortener</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔗</text></svg>">
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1b1f27; --muted: #667085; --line: #e4e7ec;
+    --accent: #4f46e5; --accent-text: #ffffff; --danger: #b42318; --ok: #067647; --bar: #6366f1;
+    --field: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115; --card: #171a21; --text: #e8eaef; --muted: #98a2b3; --line: #2a2f3a;
+      --accent: #818cf8; --accent-text: #0f1115; --danger: #f97066; --ok: #47cd89; --bar: #818cf8;
+      --field: #0f1115;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+  header { border-bottom: 1px solid var(--line); background: var(--card); }
+  .bar { display: flex; align-items: center; justify-content: space-between; min-height: 60px; gap: 12px; }
+  h1 { font-size: 1.25rem; margin: 0; }
+  h2 { font-size: 1.1rem; margin: 0 0 12px; }
+  main { padding: 24px 0 48px; display: grid; gap: 20px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  .narrow { max-width: 440px; margin: 24px auto 0; width: 100%; }
+  label { display: block; font-size: .875rem; font-weight: 600; margin: 12px 0 4px; }
+  .hint { font-weight: 400; color: var(--muted); }
+  input, select { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+                  background: var(--field); color: var(--text); font: inherit; }
+  input:focus, select:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .between { justify-content: space-between; }
+  .btn { padding: 10px 16px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent);
+         color: var(--accent-text); font: inherit; font-weight: 600; cursor: pointer; }
+  .btn:disabled { opacity: .6; cursor: wait; }
+  .btn.ghost { background: transparent; color: var(--accent); }
+  .btn.small { padding: 4px 10px; font-size: .85rem; }
+  .msg { min-height: 1.4em; margin: 12px 0 0; font-size: .925rem; }
+  .msg.error { color: var(--danger); } .msg.ok { color: var(--ok); }
+  .result { margin-top: 16px; padding: 14px; border: 1px solid var(--ok); border-radius: 10px; }
+  .result a { font-weight: 700; font-size: 1.1rem; word-break: break-all; }
+  a { color: var(--accent); }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .925rem; }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .03em; }
+  td.dest { max-width: 280px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .badge { font-size: .75rem; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--danger); color: var(--danger); margin-left: 6px; }
+  .empty { color: var(--muted); text-align: center; padding: 20px 0 4px; margin: 0; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 12px; }
+  @media (max-width: 640px) { .stats { grid-template-columns: 1fr; } }
+  .big { font-size: 2.2rem; font-weight: 700; line-height: 1.1; }
+  .barrow { display: grid; grid-template-columns: 110px 1fr 40px; gap: 8px; align-items: center; font-size: .875rem; margin: 6px 0; }
+  .barrow .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .barrow .track { background: var(--line); border-radius: 4px; height: 12px; overflow: hidden; }
+  .barrow .fill { background: var(--bar); height: 100%; }
+  .barrow .val { text-align: right; font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  svg.daily { width: 100%; height: auto; display: block; }
+  svg.daily rect { fill: var(--bar); } svg.daily text { fill: var(--muted); font-size: 11px; }
+  footer { text-align: center; color: var(--muted); font-size: .85rem; padding-bottom: 24px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap bar">
+    <h1>🔗 Shortly</h1>
+    <div id="userBox" class="row" hidden>
+      <span id="userEmail" class="muted"></span>
+      <button id="logoutBtn" class="btn ghost small" type="button">Log out</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <!-- Logged-out view -->
+  <section id="authView" class="card narrow">
+    <h2>Log in or create an account</h2>
+    <form id="authForm" novalidate>
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="email" placeholder="you@example.com" required>
+      <label for="password">Password <span class="hint">(at least 8 characters)</span></label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <div class="row" style="margin-top:16px">
+        <button id="loginBtn" class="btn" type="submit">Log in</button>
+        <button id="signupBtn" class="btn ghost" type="button">Create account</button>
+      </div>
+      <p id="authMsg" class="msg" role="alert"></p>
+    </form>
+  </section>
+
+  <!-- Logged-in view -->
+  <div id="appView" hidden style="display:grid;gap:20px">
+    <section class="card">
+      <h2>Shorten a URL</h2>
+      <form id="linkForm" novalidate>
+        <label for="longUrl">Long URL</label>
+        <input id="longUrl" type="text" inputmode="url" placeholder="https://example.com/a/very/long/page" required>
+        <div class="grid2">
+          <div>
+            <label for="alias">Custom alias <span class="hint">(optional)</span></label>
+            <input id="alias" type="text" placeholder="my-link" maxlength="32" autocomplete="off">
+          </div>
+          <div>
+            <label for="expires">Expires <span class="hint">(optional, your local time)</span></label>
+            <input id="expires" type="datetime-local">
+          </div>
+        </div>
+        <div class="row" style="margin-top:16px">
+          <button id="shortenBtn" class="btn" type="submit">Shorten</button>
+        </div>
+        <p id="linkMsg" class="msg" role="alert"></p>
+      </form>
+      <div id="result" class="result" hidden>
+        <div class="muted">Your short link</div>
+        <div class="row" style="margin:6px 0">
+          <a id="resultLink" target="_blank" rel="noopener"></a>
+          <button id="copyResult" class="btn small" type="button">Copy</button>
+        </div>
+        <div id="resultDest" class="muted" style="word-break:break-all"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row between" style="margin-bottom:8px">
+        <h2 style="margin:0">Your links</h2>
+        <button id="refreshBtn" class="btn ghost small" type="button">Refresh</button>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead>
+            <tr><th>Short link</th><th>Destination</th><th class="num">Clicks</th><th>Created</th><th>Expires</th><th></th></tr>
+          </thead>
+          <tbody id="linksBody"></tbody>
+        </table>
+      </div>
+      <p id="tableMsg" class="empty"></p>
+    </section>
+
+    <section id="statsView" class="card" hidden>
+      <div class="row between">
+        <h2 id="statsTitle" style="margin:0"></h2>
+        <button id="closeStats" class="btn ghost small" type="button">Close</button>
+      </div>
+      <div class="stats">
+        <div><div class="muted">Total clicks</div><div id="statTotal" class="big">0</div></div>
+        <div>
+          <label for="days" style="margin-top:0">Clicks per day</label>
+          <select id="days">
+            <option value="7">Last 7 days</option>
+            <option value="14" selected>Last 14 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
+        </div>
+      </div>
+      <div id="daily" style="margin-top:12px"></div>
+      <div class="stats">
+        <div><h2>By country</h2><div id="byCountry"></div></div>
+        <div><h2>By device</h2><div id="byDevice"></div></div>
+      </div>
+      <p id="statsMsg" class="msg" role="alert"></p>
+    </section>
+  </div>
+</main>
+<footer>Built with Flask · times shown in your local time zone</footer>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
+    del(k) { try { localStorage.removeItem(k); } catch { /* ignore */ } },
+  };
+  let token = store.get("shortly_token");
+  let statsLink = null;
+
+  // ---------- small helpers (user data is only ever inserted as text, never as HTML) ----------
+  function h(tag, attrs = {}, ...children) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(attrs)) {
+      if (key === "class") node.className = value;
+      else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+      else node.setAttribute(key, value);
+    }
+    for (const child of children.flat()) if (child != null) node.append(child);
+    return node;
+  }
+  function message(el, text, kind) { el.textContent = text || ""; el.className = "msg" + (kind ? " " + kind : ""); }
+  function fmtDate(iso) { return new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }); }
+  function tokenValid(t) {
+    try {
+      const payload = JSON.parse(atob(t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+      return payload.exp * 1000 > Date.now() + 5000;
+    } catch { return false; }
+  }
+  async function copyText(text, button) {
+    try { await navigator.clipboard.writeText(text); }
+    catch {
+      const box = h("textarea", { style: "position:fixed;opacity:0" }); box.value = text;
+      document.body.append(box); box.select(); document.execCommand("copy"); box.remove();
+    }
+    const old = button.textContent; button.textContent = "Copied!";
+    setTimeout(() => { button.textContent = old; }, 1200);
+  }
+
+  // ---------- API ----------
+  class ApiError extends Error {}
+  async function api(path, { method = "GET", body, auth = true } = {}) {
+    const headers = {};
+    if (body !== undefined) headers["Content-Type"] = "application/json";
+    if (auth && token) headers["Authorization"] = "Bearer " + token;
+    let res;
+    try {
+      res = await fetch(path, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
+    } catch {
+      throw new ApiError("Cannot reach the server. Is it running?");
+    }
+    let data = null;
+    try { data = await res.json(); } catch { /* no JSON body */ }
+    if (res.status === 401 && auth && token) {
+      logout("Your session expired. Please log in again.");
+      throw new ApiError("Your session expired. Please log in again.");
+    }
+    if (!res.ok) {
+      let text = (data && data.error) || "Something went wrong (HTTP " + res.status + ").";
+      if (data && Array.isArray(data.details) && data.details.length) {
+        text += " " + data.details.map((d) => d.field + ": " + d.message).join("; ");
+      }
+      throw new ApiError(text);
+    }
+    return data;
+  }
+
+  // ---------- views ----------
+  function showAuth(note) {
+    token = null; statsLink = null;
+    $("authView").hidden = false; $("appView").hidden = true; $("userBox").hidden = true;
+    message($("authMsg"), note || "", note ? "error" : "");
+  }
+  function showApp() {
+    $("authView").hidden = true; $("appView").hidden = false; $("userBox").hidden = false;
+    $("userEmail").textContent = store.get("shortly_email") || "";
+    $("statsView").hidden = true;
+    loadLinks();
+  }
+  function logout(note) {
+    store.del("shortly_token");
+    showAuth(typeof note === "string" ? note : "");
+  }
+
+  // ---------- login / signup ----------
+  async function authenticate(mode) {
+    const email = $("email").value.trim(), password = $("password").value;
+    if (!email || !password) { message($("authMsg"), "Enter your email and password.", "error"); return; }
+    $("loginBtn").disabled = $("signupBtn").disabled = true;
+    message($("authMsg"), mode === "signup" ? "Creating your account..." : "Logging in...");
+    try {
+      if (mode === "signup") await api("/api/auth/signup", { method: "POST", body: { email, password }, auth: false });
+      const login = await api("/api/auth/login", { method: "POST", body: { email, password }, auth: false });
+      token = login.access_token;
+      store.set("shortly_token", token); store.set("shortly_email", email.toLowerCase());
+      $("password").value = "";
+      message($("authMsg"), "");
+      showApp();
+    } catch (err) {
+      message($("authMsg"), err.message, "error");
+    } finally {
+      $("loginBtn").disabled = $("signupBtn").disabled = false;
+    }
+  }
+  $("authForm").addEventListener("submit", (e) => { e.preventDefault(); authenticate("login"); });
+  $("signupBtn").addEventListener("click", () => authenticate("signup"));
+  $("logoutBtn").addEventListener("click", () => logout(""));
+
+  // ---------- shorten ----------
+  $("linkForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    let url = $("longUrl").value.trim();
+    const alias = $("alias").value.trim(), expires = $("expires").value;
+    if (!url) { message($("linkMsg"), "Enter a URL to shorten.", "error"); return; }
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(url)) url = "https://" + url;   // "example.com" -> "https://example.com"
+    const body = { long_url: url };
+    if (alias) body.custom_alias = alias;
+    if (expires) {
+      const when = new Date(expires);
+      if (Number.isNaN(when.getTime())) { message($("linkMsg"), "That expiry date is not valid.", "error"); return; }
+      body.expires_at = when.toISOString();
+    }
+    $("shortenBtn").disabled = true; message($("linkMsg"), "Shortening...");
+    try {
+      const link = await api("/api/links", { method: "POST", body });
+      message($("linkMsg"), "");
+      $("resultLink").href = link.short_url; $("resultLink").textContent = link.short_url;
+      $("resultDest").textContent = "→ " + link.long_url;
+      $("result").hidden = false;
+      $("longUrl").value = ""; $("alias").value = ""; $("expires").value = "";
+      loadLinks();
+    } catch (err) {
+      $("result").hidden = true;
+      message($("linkMsg"), err.message, "error");
+    } finally {
+      $("shortenBtn").disabled = false;
+    }
+  });
+  $("copyResult").addEventListener("click", () => copyText($("resultLink").href, $("copyResult")));
+
+  // ---------- links table ----------
+  async function loadLinks() {
+    message($("tableMsg"), "Loading...");
+    $("tableMsg").className = "empty";
+    try {
+      const [links, top] = await Promise.all([
+        api("/api/links?limit=100"),
+        api("/api/analytics/top-links?limit=100"),
+      ]);
+      const clicks = new Map(top.map((t) => [t.code, t.clicks]));
+      const body = $("linksBody");
+      body.replaceChildren();
+      for (const link of links) {
+        const expired = link.expires_at && new Date(link.expires_at) < new Date();
+        const copy = h("button", { class: "btn ghost small", type: "button", style: "margin-left:8px" }, "Copy");
+        copy.addEventListener("click", () => copyText(link.short_url, copy));
+        body.append(h("tr", {},
+          h("td", {}, h("a", { href: link.short_url, target: "_blank", rel: "noopener" }, link.short_url.replace(/^https?:\/\//, "")), copy),
+          h("td", { class: "dest", title: link.long_url }, link.long_url),
+          h("td", { class: "num" }, String(clicks.get(link.code) ?? 0)),
+          h("td", {}, fmtDate(link.created_at)),
+          h("td", {}, link.expires_at ? fmtDate(link.expires_at) : "Never", expired ? h("span", { class: "badge" }, "expired") : null),
+          h("td", {}, h("button", { class: "btn small", type: "button", onclick: () => openStats(link) }, "Stats")),
+        ));
+      }
+      $("tableMsg").textContent = links.length ? "" : "No links yet. Shorten your first URL above.";
+    } catch (err) {
+      $("tableMsg").textContent = err.message;
+    }
+  }
+  $("refreshBtn").addEventListener("click", () => { loadLinks(); if (statsLink) loadStats(); });
+
+  // ---------- stats ----------
+  function bars(container, rows) {
+    container.replaceChildren();
+    if (!rows.length) { container.append(h("div", { class: "muted" }, "No clicks yet")); return; }
+    const max = Math.max(...rows.map((r) => r[1]), 1);
+    for (const [name, count] of rows) {
+      const fill = h("div", { class: "fill" }); fill.style.width = (count / max * 100) + "%";
+      container.append(h("div", { class: "barrow" },
+        h("div", { class: "name", title: name }, name), h("div", { class: "track" }, fill), h("div", { class: "val" }, String(count))));
+    }
+  }
+  function dailyChart(container, days) {
+    container.replaceChildren();
+    const NS = "http://www.w3.org/2000/svg", W = 600, H = 140;
+    const max = Math.max(...days.map((d) => d.clicks), 1), bw = W / days.length;
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("class", "daily"); svg.setAttribute("viewBox", `0 0 ${W} ${H + 18}`);
+    svg.setAttribute("role", "img"); svg.setAttribute("aria-label", "Clicks per day");
+    days.forEach((d, i) => {
+      const height = d.clicks / max * H;
+      const rect = document.createElementNS(NS, "rect");
+      rect.setAttribute("x", i * bw + 2); rect.setAttribute("width", Math.max(1, bw - 4));
+      rect.setAttribute("y", H - height); rect.setAttribute("height", height); rect.setAttribute("rx", 2);
+      const tip = document.createElementNS(NS, "title"); tip.textContent = d.date + ": " + d.clicks + " click" + (d.clicks === 1 ? "" : "s");
+      rect.append(tip); svg.append(rect);
+    });
+    const label = (x, anchor, text) => {
+      const t = document.createElementNS(NS, "text");
+      t.setAttribute("x", x); t.setAttribute("y", H + 14); t.setAttribute("text-anchor", anchor); t.textContent = text; svg.append(t);
+    };
+    label(0, "start", days[0].date); label(W, "end", days[days.length - 1].date + " (peak: " + max + ")");
+    container.append(svg);
+  }
+  function openStats(link) {
+    statsLink = link;
+    $("statsTitle").textContent = "Stats for " + link.short_url.replace(/^https?:\/\//, "");
+    $("statsView").hidden = false;
+    $("statsView").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    loadStats();
+  }
+  async function loadStats() {
+    if (!statsLink) return;
+    const code = statsLink.code, base = "/api/analytics/links/" + encodeURIComponent(code);
+    message($("statsMsg"), "Loading...");
+    try {
+      const [total, countries, devices, perDay] = await Promise.all([
+        api(base + "/total"), api(base + "/by-country"), api(base + "/by-device"),
+        api(base + "/per-day?days=" + Number($("days").value)),
+      ]);
+      if (!statsLink || statsLink.code !== code) return;   // user switched links meanwhile
+      $("statTotal").textContent = String(total.total_clicks);
+      bars($("byCountry"), countries.map((c) => [c.country, c.clicks]));
+      bars($("byDevice"), devices.map((d) => [d.device, d.clicks]));
+      dailyChart($("daily"), perDay);
+      message($("statsMsg"), "");
+    } catch (err) {
+      message($("statsMsg"), err.message, "error");
+    }
+  }
+  $("days").addEventListener("change", loadStats);
+  $("closeStats").addEventListener("click", () => { statsLink = null; $("statsView").hidden = true; });
+
+  // ---------- start ----------
+  if (token && tokenValid(token)) showApp(); else { store.del("shortly_token"); showAuth(""); }
+})();
+</script>
+</body>
+</html>

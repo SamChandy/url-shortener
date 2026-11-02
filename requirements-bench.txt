@@ -1,0 +1,4 @@
+# For benchmarking only (pulls in gevent, so it is kept out of the normal install)
+-r requirements-dev.txt
+
+locust>=2.29

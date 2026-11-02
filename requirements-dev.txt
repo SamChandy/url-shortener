@@ -1,0 +1,6 @@
+# Everything for local development: runtime + tests + demo scripts
+-r requirements.txt
+
+pytest>=8.2
+fakeredis>=2.23
+requests>=2.32
